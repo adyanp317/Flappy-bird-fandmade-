@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird 3D</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Arial', sans-serif; overflow: hidden;
+            touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+            user-select: none; -webkit-user-select: none;
+            perspective: 1000px;
+        }
+        #gameWrapper { 
+            position: relative; width: 400px; height: 600px; 
+            max-width: 100vw; max-height: 100vh;
+            transform-style: preserve-3d;
+            transform: rotateX(5deg);
+        }
+        #gameContainer {
+            position: relative; width: 100%; height: 100%;
+            border-radius: 20px; overflow: hidden;
+            box-shadow: 
+                0 30px 60px rgba(0,0,0,0.6),
+                0 0 0 3px rgba(255,255,255,0.1),
+                inset 0 0 100px rgba(0,0,0,0.3);
+            background: #70c5ce; cursor: pointer;
+            transform-style: preserve-3d;
+        }
+        canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Efek 3D pada HUD */
+        #hud { 
+            position: absolute; top: 20px; left: 0; right: 0; 
+            display: flex; justify-content: center; z-index: 10; pointer-events: none;
+            transform: translateZ(50px);
+            text-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        #score { 
+            font-size: 60px; font-weight: bold; color: white; 
+            letter-spacing: 2px; transition: transform 0.1s ease;
+            text-shadow: 
+                0 3px 0 #d4a017,
+                0 6px 10px rgba(0,0,0,0.5),
+                0 0 20px rgba(255,215,0,0.5);
+        }
+        #highScore { 
+            position: absolute; top: 10px; right: 20px; font-size: 18px; 
+            color: white; z-index: 10; pointer-events: none; 
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(0,0,0,0.3));
+            padding: 8px 15px; border-radius: 10px;
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.3);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            transform: translateZ(50px);
+        }
+        #soundToggle { 
+            position: absolute; top: 10px; left: 20px; font-size: 24px; 
+            z-index: 10; pointer-events: auto; 
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(0,0,0,0.3));
+            padding: 8px 12px; border-radius: 10px; cursor: pointer; border: none;
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.3);
+            transform: translateZ(50px);
+        }
+        #timeIndicator { 
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%) translateZ(50px); 
+            font-size: 24px; z-index: 10; pointer-events: none;
+            text-shadow: 0 3px 8px rgba(0,0,0,0.5);
+        }
+        
+        .overlay { 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            z-index: 20; transform-style: preserve-3d;
+        }
+        #startScreen { 
+            background: linear-gradient(135deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4)); 
+            cursor: pointer; backdrop-filter: blur(5px);
+        }
+        #gameOverScreen { 
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6)); 
+            display: none; backdrop-filter: blur(5px);
+        }
+        
+        .title { 
+            font-size: 42px; color: #FFD700; margin-bottom: 10px; 
+            animation: bounce 1.5s infinite; pointer-events: none;
+            text-shadow: 
+                0 3px 0 #b8860b,
+                0 6px 15px rgba(0,0,0,0.5),
+                0 0 30px rgba(255,215,0,0.6);
+            transform: translateZ(60px);
+        }
+        .bird-preview { 
+            font-size: 80px; margin-bottom: 20px; 
+            animation: flyAnimation 2s infinite; pointer-events: none;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            transform: translateZ(70px);
+        }
+        .game-over-title { 
+            font-size: 52px; color: #ff4444; margin-bottom: 20px; 
+            animation: shake 0.5s; pointer-events: none;
+            text-shadow: 
+                0 3px 0 #8b0000,
+                0 6px 15px rgba(0,0,0,0.5),
+                0 0 30px rgba(255,0,0,0.5);
+            transform: translateZ(60px);
+        }
+        .score-display { 
+            background: linear-gradient(135deg, #ffffff, #e0e0e0);
+            padding: 20px; border-radius: 15px; margin-bottom: 20px; 
+            text-align: center; min-width: 200px; pointer-events: none;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.4),
+                inset 0 2px 0 rgba(255,255,255,0.8);
+            transform: translateZ(50px);
+        }
+        .score-label { font-size: 16px; color: #666; margin-bottom: 5px; }
+        .score-value { 
+            font-size: 36px; font-weight: bold; color: #333;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn { 
+            padding: 15px 40px; font-size: 20px; border: none; border-radius: 30px; 
+            cursor: pointer; font-weight: bold; transition: all 0.3s; 
+            text-transform: uppercase; letter-spacing: 1px; pointer-events: auto; z-index: 30;
+            transform: translateZ(50px);
+            box-shadow: 
+                0 8px 0 #cc5500,
+                0 12px 25px rgba(0,0,0,0.4);
+            position: relative;
+        }
+        .btn:active { 
+            transform: translateZ(50px) translateY(5px);
+            box-shadow: 
+                0 3px 0 #cc5500,
+                0 6px 15px rgba(0,0,0,0.4);
+        }
+        .btn-start { 
+            background: linear-gradient(135deg, #FF8800, #FF6600); 
+            color: white; animation: pulse 1.5s infinite; 
+        }
+        .btn-restart { 
+            background: linear-gradient(135deg, #FF8800, #FF6600); 
+            color: white; 
+        }
+        .instructions { 
+            color: white; font-size: 14px; margin-top: 20px; text-align: center; 
+            pointer-events: none; line-height: 1.6;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            transform: translateZ(40px);
+        }
+        .instructions span { 
+            display: inline-block; 
+            background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+            padding: 4px 10px; border-radius: 5px; margin: 2px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .medal { 
+            font-size: 60px; margin-bottom: 20px; animation: bounce 1s infinite; 
+            pointer-events: none;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            transform: translateZ(60px);
+        }
+        .new-high-score { 
+            color: #FFD700; font-size: 24px; font-weight: bold; 
+            animation: pulse 1s infinite; margin-bottom: 10px; pointer-events: none;
+            text-shadow: 0 3px 10px rgba(255,215,0,0.8);
+            transform: translateZ(55px);
+        }
+        
+        @keyframes bounce { 0%,100%{transform:translateZ(60px) translateY(0)} 50%{transform:translateZ(60px) translateY(-10px)} }
+        @keyframes flyAnimation { 0%,100%{transform:translateZ(70px) translateY(0) rotate(0)} 25%{transform:translateZ(70px) translateY(-20px) rotate(-5deg)} 50%{transform:translateZ(70px) translateY(0) rotate(0)} 75%{transform:translateZ(70px) translateY(-20px) rotate(5deg)} }
+        @keyframes pulse { 0%,100%{transform:translateZ(50px) scale(1)} 50%{transform:translateZ(50px) scale(1.1)} }
+        @keyframes shake { 0%,100%{transform:translateZ(60px) translateX(0)} 25%{transform:translateZ(60px) translateX(-10px)} 75%{transform:translateZ(60px) translateX(10px)} }
+    </style>
+</head>
+<body>
+    <div id="gameWrapper">
+        <div id="gameContainer">
+            <canvas id="gameCanvas" width="400" height="600"></canvas>
+            <div id="hud"><div id="score">0</div></div>
+            <div id="timeIndicator">☀️</div>
+            <button id="soundToggle" onclick="toggleSound()">🔊</button>
+            <div id="highScore">🏆 Terbaik: 0</div>
+            <div id="startScreen" class="overlay">
+                <div class="bird-preview">🐦</div>
+                <div class="title">Flappy Bird 3D</div>
+                <button class="btn btn-start" id="startButton">▶ MULAI</button>
+                <div class="instructions"><p><span>SPASI</span> atau <span>KLIK</span> untuk terbang</p><p>Hindari pipa hijau!</p></div>
+            </div>
+            <div id="gameOverScreen" class="overlay">
+                <div class="game-over-title">GAME OVER!</div>
+                <div class="medal" id="medal">🥉</div>
+                <div class="score-display">
+                    <div class="score-label">Skor Anda</div>
+                    <div class="score-value" id="finalScore">0</div>
+                    <div class="score-label" style="margin-top:10px;">Skor Terbaik</div>
+                    <div class="score-value" id="bestScore">0</div>
+                </div>
+                <div class="new-high-score" id="newHighScore" style="display:none;">🎉 REKOR BARU! 🎉</div>
+                <button class="btn btn-restart" id="restartButton">🔄 MAIN LAGI</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const bestScoreElement = document.getElementById('bestScore');
+        const newHighScoreElement = document.getElementById('newHighScore');
+        const medalElement = document.getElementById('medal');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const soundToggle = document.getElementById('soundToggle');
+        const timeIndicator = document.getElementById('timeIndicator');
+        
+        let audioContext = null;
+        let soundEnabled = true;
+        let bird = { x: 100, y: 300, velocity: 0, gravity: 0.4, jump: -7, rotation: 0, wingAngle: 0, animationFrame: 0, z: 0 };
+        let pipes = [];
+        let score = 0, highScore = 0, gameRunning = false, gameStarted = false, frameCount = 0, animationId = null;
+        let isNight = false, transitionProgress = 0;
+        let pipeWidth = 70, pipeGap = 160, pipeSpeed = 3, pipeSpawnInterval = 100;
+        let cityOffset = 0, mountainOffset = 0;
+        
+        let stars = []; for(let i=0;i<100;i++) stars.push({x:Math.random()*400,y:Math.random()*380,size:Math.random()*2+1,twinkleSpeed:Math.random()*0.1+0.03,twinkleOffset:Math.random()*Math.PI*2});
+        let mountains = []; {let x=0;while(x<800){mountains.push({x:x,width:Math.random()*100+80,height:Math.random()*50+70,depth:Math.random()*0.5+0.5});x+=mountains[mountains.length-1].width+30;}}
+        let buildings = []; {const colors=['#8D6E63','#78909C','#90A4AE','#B0BEC5','#A1887F','#607D8B'];let x=0;while(x<800){buildings.push({x:x,width:Math.random()*30+35,height:Math.random()*50+70,color:colors[Math.floor(Math.random()*colors.length)],depth:Math.random()*0.5+0.5});x+=buildings[buildings.length-1].width+5;}}
+        let houses = []; {const hc=['#FFE0B2','#FFCCBC','#F5F5F5','#EFEBE9'],rc=['#D84315','#BF360C','#E64A19','#F4511E'];let x=0;while(x<800){houses.push({x:x,width:Math.random()*20+40,height:Math.random()*15+35,color:hc[Math.floor(Math.random()*hc.length)],roofColor:rc[Math.floor(Math.random()*rc.length)],depth:Math.random()*0.5+0.5});x+=houses[houses.length-1].width+20;}}
+        let trees = []; {let x=50;while(x<800){trees.push({x:x,height:Math.random()*12+28,type:Math.random()>0.5?'pine':'round',color:['#2E7D32','#388E3C','#43A047'][Math.floor(Math.random()*3)],depth:Math.random()*0.5+0.5});x+=Math.random()*40+35;}}
+        let streetLights = []; for(let x=30;x<800;x+=100) streetLights.push({x:x});
+        const planeColors=['#F5F5F5','#FFE082','#FF8A80','#B3E5FC','#C8E6C9','#E1BEE7','#FFCCBC'];
+        let airplane = {x:-200,y:130,color:planeColors[Math.floor(Math.random()*planeColors.length)],z:0};
+        let vehicles=[{x:50,y:565,width:50,height:20,speed:1.5,color:'#C62828',type:'car',wheelAngle:0},{x:150,y:572,width:25,height:12,speed:2,color:'#4444FF',type:'motorcycle',wheelAngle:0},{x:250,y:565,width:50,height:20,speed:1.2,color:'#FFAA00',type:'car',wheelAngle:0},{x:350,y:572,width:25,height:12,speed:2.5,color:'#44FF44',type:'motorcycle',wheelAngle:0}];
+        let pedestrians=[{x:20,y:550,speed:0.5,color:'#FF69B4',direction:1,legAngle:0,gender:'female',hairColor:'#333'},{x:220,y:550,speed:0.6,color:'#2196F3',direction:-1,legAngle:0,gender:'male',hairColor:'#000'},{x:380,y:550,speed:0.5,color:'#9370DB',direction:-1,legAngle:0,gender:'female',hairColor:'#FF6600'}];
+        
+        function initAudio() { if(!audioContext){ try{audioContext=new(window.AudioContext||window.webkitAudioContext)()}catch(e){} } }
+        function toggleSound(){ soundEnabled=!soundEnabled; soundToggle.textContent=soundEnabled?'🔊':'🔇'; }
+        function playJumpSound(){ if(!soundEnabled||!audioContext)return; const o=audioContext.createOscillator(),g=audioContext.createGain(); o.connect(g);g.connect(audioContext.destination); o.frequency.setValueAtTime(400,audioContext.currentTime); o.frequency.exponentialRampToValueAtTime(800,audioContext.currentTime+0.1); o.type='sine'; g.gain.setValueAtTime(0.15,audioContext.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioContext.currentTime+0.1); o.start();o.stop(audioContext.currentTime+0.1); }
+        function playScoreSound(){ if(!soundEnabled||!audioContext)return; const o=audioContext.createOscillator(),g=audioContext.createGain(); o.connect(g);g.connect(audioContext.destination); o.frequency.setValueAtTime(600,audioContext.currentTime); o.frequency.exponentialRampToValueAtTime(1200,audioContext.currentTime+0.15); o.type='triangle'; g.gain.setValueAtTime(0.2,audioContext.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioContext.currentTime+0.15); o.start();o.stop(audioContext.currentTime+0.15); }
+        function playHitSound(){ if(!soundEnabled||!audioContext)return; const o=audioContext.createOscillator(),g=audioContext.createGain(); o.connect(g);g.connect(audioContext.destination); o.frequency.setValueAtTime(200,audioContext.currentTime); o.frequency.exponentialRampToValueAtTime(50,audioContext.currentTime+0.3); o.type='square'; g.gain.setValueAtTime(0.3,audioContext.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioContext.currentTime+0.3); o.start();o.stop(audioContext.currentTime+0.3); }
+        function playGameOverSound(){ if(!soundEnabled||!audioContext)return; const notes=[400,300,200,100]; notes.forEach((f,i)=>{const o=audioContext.createOscillator(),g=audioContext.createGain();o.connect(g);g.connect(audioContext.destination);o.frequency.value=f;o.type='sawtooth';g.gain.setValueAtTime(0.1,audioContext.currentTime+i*0.15);g.gain.exponentialRampToValueAtTime(0.01,audioContext.currentTime+i*0.15+0.15);o.start(audioContext.currentTime+i*0.15);o.stop(audioContext.currentTime+i*0.15+0.15);}); }
+        
+        try{highScore=parseInt(localStorage.getItem('flappyHighScore'))||0}catch(e){highScore=0}
+        highScoreElement.textContent=`🏆 Terbaik: ${highScore}`;
+        drawBackground();
+        
+        function initGame(){ 
+            bird.y=300;bird.velocity=0;bird.rotation=0;bird.wingAngle=0;bird.animationFrame=0;bird.z=0;
+            pipes=[];score=0;frameCount=0;cityOffset=0;mountainOffset=0;
+            isNight=false;transitionProgress=0;
+            airplane.color=planeColors[Math.floor(Math.random()*planeColors.length)]; 
+            scoreElement.textContent='0';gameOverScreen.style.display='none';startScreen.style.display='none';
+            newHighScoreElement.style.display='none';timeIndicator.textContent='☀️'; 
+            gameRunning=true;gameStarted=true; 
+            if(animationId)cancelAnimationFrame(animationId); 
+            animationId=requestAnimationFrame(gameLoop); 
+            initAudio(); 
+        }
+        function startGame(){initGame()} function restartGame(){initGame()}
+        
+        function gameLoop(){ if(!gameRunning)return; update(); draw(); if(gameRunning)animationId=requestAnimationFrame(gameLoop); }
+        
+        function update(){
+            frameCount++;
+            const targetProgress=isNight?1:0;
+            transitionProgress+=(targetProgress-transitionProgress)*0.04;
+            cityOffset-=0.5; if(cityOffset<=-800)cityOffset=0;
+            mountainOffset-=0.3; if(mountainOffset<=-800)mountainOffset=0;
+            airplane.x+=0.8; if(airplane.x>450){airplane.x=-200;airplane.color=planeColors[Math.floor(Math.random()*planeColors.length)];}
+            
+            vehicles.forEach(v=>{v.x-=v.speed;v.wheelAngle+=v.speed*0.2;if(v.x<-60)v.x=canvas.width+Math.random()*100;});
+            pedestrians.forEach(p=>{p.x+=p.speed*p.direction;p.legAngle+=0.1;if(p.x>canvas.width+20)p.x=-20;if(p.x<-20)p.x=canvas.width+20;});
+            
+            bird.velocity+=bird.gravity;
+            bird.y+=bird.velocity;
+            bird.rotation=bird.velocity>0?Math.min(bird.velocity*3,70):Math.max(bird.velocity*3,-20);
+            bird.animationFrame++;
+            bird.wingAngle=Math.sin(bird.animationFrame*0.3)*30;
+            
+            if(bird.y<=0){bird.y=0;bird.velocity=0;}
+            if(bird.y>=555){bird.y=555;bird.velocity=0;playHitSound();gameOver();return;}
+            
+            if(frameCount%pipeSpawnInterval===0)spawnPipe();
+            
+            for(let i=pipes.length-1;i>=0;i--){
+                pipes[i].x-=pipeSpeed;
+                if(checkCollision(bird,pipes[i])){
+                    playHitSound();
+                    gameOver();
+                    return;
+                }
+                if(!pipes[i].passed&&pipes[i].x+pipeWidth<bird.x){
+                    pipes[i].passed=true;score++;
+                    scoreElement.textContent=score;
+                    playScoreSound();
+                    updateDayNightCycle();
+                }
+                if(pipes[i].x+pipeWidth<-50)pipes.splice(i,1);
+            }
+        }
+        
+        function updateDayNightCycle(){ if(score===10){isNight=true;timeIndicator.textContent='🌙'}else if(score===20){isNight=false;timeIndicator.textContent='☀️'}else if(score===30){isNight=true;timeIndicator.textContent='🌙'} }
+        function lerpColor(c1,c2,t){const r1=parseInt(c1.slice(1,3),16),g1=parseInt(c1.slice(3,5),16),b1=parseInt(c1.slice(5,7),16),r2=parseInt(c2.slice(1,3),16),g2=parseInt(c2.slice(3,5),16),b2=parseInt(c2.slice(5,7),16);return`rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;}
+        
+        function draw(){drawBackground();for(let pipe of pipes)drawPipe(pipe);drawBird();}
+        
+        function drawBackground(){
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            const t=transitionProgress;
+            
+            // Sky gradient dengan efek 3D
+            const skyGrad=ctx.createLinearGradient(0,0,0,420);
+            skyGrad.addColorStop(0,lerpColor('#B3E5FC','#0D1B2A',t));
+            skyGrad.addColorStop(0.5,lerpColor('#81D4FA','#1B263B',t*0.7));
+            skyGrad.addColorStop(1,lerpColor('#4FC3F7','#415A77',t*0.4));
+            ctx.fillStyle=skyGrad;ctx.fillRect(0,0,canvas.width,420);
+            
+            // Ground dengan efek 3D (gradasi vertikal lebih gelap di bawah)
+            const groundGrad=ctx.createLinearGradient(0,420,0,550);
+            groundGrad.addColorStop(0,lerpColor('#A5D6A7','#2E7D32',t));
+            groundGrad.addColorStop(0.3,lerpColor('#81C784','#1B5E20',t));
+            groundGrad.addColorStop(0.7,lerpColor('#66BB6A','#1B5E20',t));
+            groundGrad.addColorStop(1,lerpColor('#4CAF50','#0D3B0F',t));
+            ctx.fillStyle=groundGrad;ctx.fillRect(0,420,canvas.width,130);
+            
+            // Danau dengan efek 3D (highlight di atas, shadow di bawah)
+            const lakeGrad=ctx.createLinearGradient(0,440,0,530);
+            lakeGrad.addColorStop(0,lerpColor('#90CAF9','#1565C0',t));
+            lakeGrad.addColorStop(0.2,lerpColor('#64B5F6','#0D47A1',t));
+            lakeGrad.addColorStop(0.5,lerpColor('#42A5F5','#1565C0',t));
+            lakeGrad.addColorStop(0.8,lerpColor('#2196F3','#1976D2',t));
+            lakeGrad.addColorStop(1,lerpColor('#1565C0','#0D47A1',t));
+            ctx.fillStyle=lakeGrad;
+            ctx.beginPath();
+            ctx.ellipse(200,485,100,50,0,0,Math.PI*2);
+            ctx.fill();
+            
+            // Highlight danau (efek 3D)
+            ctx.fillStyle='rgba(255,255,255,0.4)';
+            ctx.beginPath();ctx.ellipse(180,470,40,8,-0.2,0,Math.PI*2);ctx.fill();
+            ctx.beginPath();ctx.ellipse(220,490,30,6,0.1,0,Math.PI*2);ctx.fill();
+            
+            // Shadow danau
+            ctx.fillStyle='rgba(0,0,0,0.2)';
+            ctx.beginPath();ctx.ellipse(200,530,90,8,0,0,Math.PI*2);ctx.fill();
+            
+            // Sun/Moon dengan efek 3D
+            const sunX=80,sunY=70;
+            if(t<0.8){
+                const sunAlpha=Math.max(0,1-t*1.5),sunOffsetY=t*60;
+                ctx.globalAlpha=sunAlpha;
+                ctx.fillStyle='rgba(255,215,0,0.3)';
+                for(let i=0;i<12;i++){const angle=(i/12)*Math.PI*2+frameCount*0.005;ctx.beginPath();ctx.moveTo(sunX+Math.cos(angle)*45,sunY+sunOffsetY+Math.sin(angle)*45);ctx.lineTo(sunX+Math.cos(angle)*60,sunY+sunOffsetY+Math.sin(angle)*60);ctx.lineWidth=3;ctx.strokeStyle='rgba(255,215,0,0.4)';ctx.stroke();}
+                // Shadow matahari (efek 3D)
+                ctx.fillStyle='rgba(0,0,0,0.2)';
+                ctx.beginPath();ctx.arc(sunX+3,sunY+sunOffsetY+3,35,0,Math.PI*2);ctx.fill();
+                // Matahari dengan gradasi 3D
+                const sunGrad=ctx.createRadialGradient(sunX-10,sunY+sunOffsetY-10,5,sunX,sunY+sunOffsetY,40);
+                sunGrad.addColorStop(0,'#FFFFFF');
+                sunGrad.addColorStop(0.3,'#FFF9C4');
+                sunGrad.addColorStop(0.6,'#FFD700');
+                sunGrad.addColorStop(1,'#FF8F00');
+                ctx.fillStyle=sunGrad;ctx.beginPath();ctx.arc(sunX,sunY+sunOffsetY,35,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            if(t>0.2){
+                const moonAlpha=Math.max(0,(t-0.2)*1.5),moonOffsetY=(1-t)*-60;
+                ctx.globalAlpha=moonAlpha;
+                // Shadow bulan
+                ctx.fillStyle='rgba(0,0,0,0.3)';
+                ctx.beginPath();ctx.arc(sunX+3,sunY+moonOffsetY+3,30,0,Math.PI*2);ctx.fill();
+                // Bulan dengan gradasi 3D
+                const moonGrad=ctx.createRadialGradient(sunX-10,sunY+moonOffsetY-10,5,sunX,sunY+moonOffsetY,35);
+                moonGrad.addColorStop(0,'#FFFFFF');
+                moonGrad.addColorStop(0.7,'#F5F5F5');
+                moonGrad.addColorStop(1,'#BDBDBD');
+                ctx.fillStyle=moonGrad;ctx.beginPath();ctx.arc(sunX,sunY+moonOffsetY,30,0,Math.PI*2);ctx.fill();
+                // Kawah bulan
+                ctx.fillStyle='rgba(180,180,180,0.6)';
+                ctx.beginPath();ctx.arc(sunX-8,sunY+moonOffsetY-5,5,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.arc(sunX+7,sunY+moonOffsetY+8,4,0,Math.PI*2);ctx.fill();
+                ctx.globalAlpha=1;
+            }
+            if(t>0.1){
+                const starAlpha=Math.max(0,(t-0.1)*2);
+                stars.forEach(star=>{const twinkle=Math.sin(frameCount*star.twinkleSpeed+star.twinkleOffset)*0.5+0.5;ctx.globalAlpha=starAlpha*twinkle;ctx.fillStyle='white';ctx.fillRect(star.x,star.y,star.size,star.size);});
+                ctx.globalAlpha=1;
+            }
+            
+            // Clouds dengan efek 3D
+            const clouds=[{x:30+(frameCount%400)*0.3,y:35,scale:0.8,z:0.8},{x:120+(frameCount%350)*0.2,y:60,scale:1,z:1},{x:200+(frameCount%300)*0.4,y:30,scale:0.7,z:0.7},{x:280+(frameCount%450)*0.25,y:80,scale:0.9,z:0.9},{x:350+(frameCount%380)*0.35,y:45,scale:0.6,z:0.6},{x:80+(frameCount%320)*0.3,y:110,scale:0.75,z:0.75},{x:180+(frameCount%420)*0.2,y:140,scale:0.85,z:0.85},{x:260+(frameCount%360)*0.4,y:100,scale:0.65,z:0.65},{x:320+(frameCount%400)*0.3,y:160,scale:0.7,z:0.7},{x:50+(frameCount%380)*0.25,y:180,scale:0.8,z:0.8}];
+            clouds.forEach(c=>{
+                ctx.save();
+                ctx.translate(c.x,c.y);
+                ctx.scale(c.scale,c.scale);
+                ctx.globalAlpha=0.85-t*0.5;
+                // Shadow awan (efek 3D)
+                ctx.fillStyle='rgba(0,0,0,0.15)';
+                ctx.beginPath();ctx.arc(3,3,22,0,Math.PI*2);ctx.arc(25,-4,26,0,Math.PI*2);ctx.arc(47,3,22,0,Math.PI*2);ctx.fill();
+                // Awan dengan gradasi 3D
+                const cloudGrad=ctx.createRadialGradient(0,-10,5,22,0,45);
+                cloudGrad.addColorStop(0,lerpColor('#FFFFFF','#DDDDEE',t));
+                cloudGrad.addColorStop(0.5,lerpColor('#F5F5F5','#BBBBC0',t));
+                cloudGrad.addColorStop(1,lerpColor('#E0E0E0','#9999AA',t));
+                ctx.fillStyle=cloudGrad;
+                ctx.beginPath();ctx.arc(0,0,22,0,Math.PI*2);ctx.arc(22,-7,26,0,Math.PI*2);ctx.arc(44,0,22,0,Math.PI*2);ctx.fill();
+                ctx.restore();
+                ctx.globalAlpha=1;
+            });
+            
+            drawAirplane();
+            
+            // Buildings dengan efek 3D
+            buildings.forEach(b=>{
+                const x=b.x+cityOffset*0.5;
+                // Shadow gedung
+                ctx.fillStyle='rgba(0,0,0,0.3)';
+                ctx.fillRect(x+4,420-b.height+4,b.width,b.height);
+                // Gedung dengan gradasi 3D (highlight kiri, shadow kanan)
+                const buildingGrad=ctx.createLinearGradient(x,0,x+b.width,0);
+                buildingGrad.addColorStop(0,lerpColor(b.color,'#2A2A3E',t));
+                buildingGrad.addColorStop(0.3,lerpColor('#FFFFFF','#3A3A4E',t));
+                buildingGrad.addColorStop(0.7,lerpColor(b.color,'#1A1A2E',t));
+                buildingGrad.addColorStop(1,lerpColor('#333333','#0A0A1E',t));
+                ctx.fillStyle=buildingGrad;
+                ctx.fillRect(x,420-b.height,b.width,b.height);
+                // Top highlight
+                ctx.fillStyle='rgba(255,255,255,0.2)';
+                ctx.fillRect(x,420-b.height,b.width,3);
+                // Windows
+                ctx.fillStyle=t>0.5?'#FFE082':'#E0E0E0';
+                for(let wy=420-b.height+10;wy<420-10;wy+=22){
+                    for(let wx=x+5;wx<x+b.width-5;wx+=18){
+                        ctx.fillRect(wx,wy,6,8);
+                    }
+                }
+            });
+            
+            // Mountains dengan efek 3D
+            mountains.forEach(m=>{
+                const x=m.x+mountainOffset;
+                const mountainGrad=ctx.createLinearGradient(0,550-m.height,0,550);
+                mountainGrad.addColorStop(0,lerpColor('#81C784','#2E7D32',t));
+                mountainGrad.addColorStop(0.5,lerpColor('#4CAF50','#1B5E20',t));
+                mountainGrad.addColorStop(1,lerpColor('#388E3C','#0D3B0F',t));
+                ctx.fillStyle=mountainGrad;
+                ctx.beginPath();
+                ctx.moveTo(x,550);
+                ctx.quadraticCurveTo(x+m.width/2,550-m.height,x+m.width,550);
+                ctx.closePath();
+                ctx.fill();
+                // Highlight gunung
+                ctx.fillStyle='rgba(255,255,255,0.2)';
+                ctx.beginPath();
+                ctx.moveTo(x+m.width/2,550-m.height);
+                ctx.quadraticCurveTo(x+m.width*0.7,550-m.height*0.6,x+m.width*0.6,550);
+                ctx.lineTo(x+m.width/2,550);
+                ctx.closePath();
+                ctx.fill();
+            });
+            
+            // Houses dengan efek 3D
+            houses.forEach(h=>{
+                const x=h.x+cityOffset*0.8;
+                // Shadow
+                ctx.fillStyle='rgba(0,0,0,0.2)';
+                ctx.fillRect(x+3,550-h.height+3,h.width,h.height);
+                // House body dengan gradasi 3D
+                const houseGrad=ctx.createLinearGradient(x,0,x+h.width,0);
+                houseGrad.addColorStop(0,lerpColor(h.color,'#5A5A5A',t));
+                houseGrad.addColorStop(0.5,lerpColor('#FFFFFF','#6A6A6A',t));
+                houseGrad.addColorStop(1,lerpColor(h.color,'#4A4A4A',t));
+                ctx.fillStyle=houseGrad;
+                ctx.fillRect(x,550-h.height,h.width,h.height);
+                // Roof dengan gradasi 3D
+                const roofGrad=ctx.createLinearGradient(0,550-h.height-18,0,550-h.height);
+                roofGrad.addColorStop(0,lerpColor(h.roofColor,'#444444',t));
+                roofGrad.addColorStop(1,lerpColor('#8B0000','#2A2A2A',t));
+                ctx.fillStyle=roofGrad;
+                ctx.beginPath();
+                ctx.moveTo(x-5,550-h.height);
+                ctx.lineTo(x+h.width/2,550-h.height-18);
+                ctx.lineTo(x+h.width+5,550-h.height);
+                ctx.closePath();
+                ctx.fill();
+                // Door
+                ctx.fillStyle='#5D4037';
+                ctx.fillRect(x+h.width/2-6,550-18,12,18);
+                // Windows
+                ctx.fillStyle=lerpColor('#E3F2FD','#FFE082',t);
+                ctx.fillRect(x+8,550-h.height+8,10,10);
+                ctx.fillRect(x+h.width-18,550-h.height+8,10,10);
+            });
+            
+            // Trees dengan efek 3D
+            trees.forEach(tree=>{
+                const x=tree.x+cityOffset*0.8;
+                // Trunk
+                ctx.fillStyle='#5D4037';
+                ctx.fillRect(x-2,550-tree.height*0.4,4,tree.height*0.4);
+                // Shadow pohon
+                ctx.fillStyle='rgba(0,0,0,0.2)';
+                ctx.beginPath();ctx.arc(x+3,550-tree.height*0.5,tree.height*0.28,0,Math.PI*2);ctx.fill();
+                // Tree dengan gradasi 3D
+                const treeGrad=ctx.createRadialGradient(x-5,550-tree.height*0.6,2,x,550-tree.height*0.5,tree.height*0.5);
+                treeGrad.addColorStop(0,lerpColor('#81C784','#4CAF50',t));
+                treeGrad.addColorStop(0.7,lerpColor('#4CAF50','#2E7D32',t));
+                treeGrad.addColorStop(1,lerpColor('#2E7D32','#1B5E20',t));
+                ctx.fillStyle=treeGrad;
+                if(tree.type==='pine'){
+                    ctx.beginPath();
+                    ctx.moveTo(x,550-tree.height);
+                    ctx.lineTo(x-10,550-tree.height*0.5);
+                    ctx.lineTo(x+10,550-tree.height*0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                }else{
+                    ctx.beginPath();
+                    ctx.arc(x,550-tree.height*0.6,tree.height*0.28,0,Math.PI*2);
+                    ctx.fill();
+                }
+            });
+            
+            // Street Lights dengan efek 3D
+            streetLights.forEach(light=>{
+                const x=light.x+cityOffset*0.8;
+                ctx.fillStyle='#555';
+                ctx.fillRect(x-1,550-32,2,32);
+                ctx.fillRect(x-7,550-32,14,2);
+                ctx.fillStyle=t>0.5?'#FFE082':'#888';
+                ctx.beginPath();ctx.arc(x,550-34,3,0,Math.PI*2);ctx.fill();
+                if(t>0.5){
+                    ctx.globalAlpha=(t-0.5)*2*0.3;
+                    ctx.fillStyle='#FFE082';
+                    ctx.beginPath();ctx.arc(x,550-34,10,0,Math.PI*2);ctx.fill();
+                    ctx.globalAlpha=1;
+                }
+            });
+            
+            // Ground dengan efek 3D
+            ctx.fillStyle=lerpColor('#8B7355','#5D4037',t);ctx.fillRect(0,550,canvas.width,10);
+            ctx.fillStyle=lerpColor('#555555','#333333',t);ctx.fillRect(0,560,canvas.width,35);
+            ctx.fillStyle=t>0.5?'#FFAA00':'#FFFFFF';
+            const roadOffset=(frameCount*2)%50;
+            for(let x=-50+roadOffset;x<canvas.width+50;x+=50){ctx.fillRect(x,575,25,3);}
+            ctx.fillStyle=lerpColor('#8B7355','#5D4037',t);ctx.fillRect(0,595,canvas.width,5);
+            
+            vehicles.forEach(v=>{if(v.type==='car')drawCar(v);else drawSmallMotorcycle(v);});
+            pedestrians.forEach(p=>{drawPedestrian(p);});
+        }
+        
+        function drawAirplane(){
+            ctx.save();
+            ctx.translate(airplane.x,airplane.y);
+            // Shadow pesawat
+            ctx.fillStyle='rgba(0,0,0,0.2)';
+            ctx.beginPath();ctx.ellipse(3,3,25,5,0,0,Math.PI*2);ctx.fill();
+            // Body dengan gradasi 3D
+            const bg=ctx.createLinearGradient(0,-5,0,5);
+            bg.addColorStop(0,'#FFFFFF');
+            bg.addColorStop(0.4,airplane.color);
+            bg.addColorStop(1,'#BBBBBB');
+            ctx.fillStyle=bg;
+            ctx.beginPath();ctx.ellipse(0,0,25,5,0,0,Math.PI*2);ctx.fill();
+            // Nose
+            ctx.fillStyle=airplane.color;
+            ctx.beginPath();ctx.moveTo(22,-3);ctx.quadraticCurveTo(30,0,22,3);ctx.closePath();ctx.fill();
+            // Wing dengan gradasi
+            const wg=ctx.createLinearGradient(0,-10,0,0);
+            wg.addColorStop(0,'#FFFFFF');
+            wg.addColorStop(0.5,airplane.color);
+            wg.addColorStop(1,'#999999');
+            ctx.fillStyle=wg;
+            ctx.beginPath();ctx.moveTo(2,0);ctx.lineTo(8,-10);ctx.lineTo(18,-10);ctx.lineTo(12,0);ctx.closePath();ctx.fill();
+            // Tail
+            ctx.fillStyle=airplane.color;
+            ctx.beginPath();ctx.moveTo(-20,-2);ctx.lineTo(-25,-8);ctx.lineTo(-18,-6);ctx.closePath();ctx.fill();
+            // Windows
+            ctx.fillStyle='#87CEEB';
+            ctx.fillRect(-12,-1,3,2);ctx.fillRect(-6,-1,3,2);ctx.fillRect(0,-1,3,2);ctx.fillRect(6,-1,3,2);
+            ctx.restore();
+        }
+        
+        function drawCar(v){
+            ctx.save();
+            ctx.translate(v.x,v.y);
+            // Shadow
+            ctx.fillStyle='rgba(0,0,0,0.3)';
+            ctx.fillRect(3,3,v.width,v.height);
+            // Body dengan gradasi 3D
+            const cg=ctx.createLinearGradient(0,0,0,v.height);
+            cg.addColorStop(0,'#FFFFFF');
+            cg.addColorStop(0.3,v.color);
+            cg.addColorStop(1,'#222222');
+            ctx.fillStyle=cg;
+            ctx.fillRect(0,0,v.width,v.height);
+            // Roof
+            ctx.fillStyle=v.color;
+            ctx.fillRect(8,-8,v.width-16,10);
+            // Windows
+            ctx.fillStyle=isNight?'#666699':'#87CEEB';
+            ctx.fillRect(10,-6,8,6);ctx.fillRect(v.width-18,-6,8,6);
+            // Wheels
+            ctx.save();ctx.translate(12,v.height);ctx.rotate(v.wheelAngle);ctx.fillStyle='#333';ctx.fillRect(-4,-4,8,8);ctx.restore();
+            ctx.save();ctx.translate(v.width-12,v.height);ctx.rotate(v.wheelAngle);ctx.fillStyle='#333';ctx.fillRect(-4,-4,8,8);ctx.restore();
+            // Headlights
+            ctx.fillStyle='#FFFF00';ctx.fillRect(v.width-2,3,3,5);
+            ctx.fillStyle='#FF0000';ctx.fillRect(0,3,2,5);
+            ctx.restore();
+        }
+        
+        function drawSmallMotorcycle(v){
+            ctx.save();
+            ctx.translate(v.x,v.y);
+            ctx.save();ctx.translate(3,8);ctx.rotate(v.wheelAngle);ctx.fillStyle='#222';ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#666';ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();ctx.restore();
+            ctx.save();ctx.translate(20,8);ctx.rotate(v.wheelAngle);ctx.fillStyle='#222';ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#666';ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();ctx.restore();
+            const bg2=ctx.createLinearGradient(0,2,0,8);
+            bg2.addColorStop(0,'#FFFFFF');bg2.addColorStop(0.3,v.color);bg2.addColorStop(1,'#222222');
+            ctx.fillStyle=bg2;
+            ctx.beginPath();ctx.moveTo(0,6);ctx.lineTo(5,3);ctx.lineTo(10,2);ctx.lineTo(16,3);ctx.lineTo(22,5);ctx.lineTo(22,8);ctx.lineTo(0,8);ctx.closePath();ctx.fill();
+            ctx.fillStyle='#222';ctx.fillRect(11,0,8,3);
+            ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(5,3);ctx.lineTo(6,-2);ctx.lineTo(9,-2);ctx.stroke();
+            ctx.fillStyle='#333';ctx.fillRect(10,-10,8,10);
+            ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(14,-13,4,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#FF0000';ctx.beginPath();ctx.arc(14,-14,5,Math.PI,0);ctx.fill();
+            ctx.fillStyle='#333';ctx.fillRect(11,-14,4,2);
+            ctx.restore();
+        }
+        
+        function drawPedestrian(p){
+            ctx.save();
+            ctx.translate(p.x,p.y);
+            // Shadow
+            ctx.fillStyle='rgba(0,0,0,0.2)';
+            ctx.beginPath();ctx.ellipse(2,2,6,3,0,0,Math.PI*2);ctx.fill();
+            // Legs
+            ctx.strokeStyle='#333';ctx.lineWidth=2;
+            const legSwing=Math.sin(p.legAngle)*3;
+            ctx.beginPath();ctx.moveTo(-2,-2);ctx.lineTo(-4+legSwing,3);ctx.moveTo(2,-2);ctx.lineTo(4-legSwing,3);ctx.stroke();
+            // Body dengan gradasi 3D
+            const bg3=ctx.createLinearGradient(0,-12,0,-2);
+            bg3.addColorStop(0,'#FFFFFF');bg3.addColorStop(0.3,p.color);bg3.addColorStop(1,'#444444');
+            ctx.fillStyle=bg3;
+            ctx.fillRect(-4,-12,8,10);
+            // Arms
+            ctx.strokeStyle=p.color;ctx.lineWidth=2;
+            ctx.beginPath();ctx.moveTo(-4,-10);ctx.lineTo(-7-legSwing,-4);ctx.moveTo(4,-10);ctx.lineTo(7+legSwing,-4);ctx.stroke();
+            // Head dengan gradasi
+            const headGrad=ctx.createRadialGradient(-2,-17,1,0,-15,6);
+            headGrad.addColorStop(0,'#FFF9C4');headGrad.addColorStop(1,'#FFD700');
+            ctx.fillStyle=headGrad;
+            ctx.beginPath();ctx.arc(0,-15,5,0,Math.PI*2);ctx.fill();
+            // Hair
+            if(p.gender==='female'){
+                ctx.fillStyle=p.hairColor;
+                ctx.beginPath();ctx.arc(0,-16,4,Math.PI,0);ctx.fill();
+                ctx.fillRect(-5,-16,2,6);ctx.fillRect(3,-16,2,6);
+            }else{
+                ctx.fillStyle=p.hairColor;
+                ctx.beginPath();ctx.arc(0,-16,4,Math.PI,0);ctx.fill();
+            }
+            ctx.restore();
+        }
+        
+        function drawBird(){
+            ctx.save();
+            ctx.translate(bird.x,bird.y);
+            ctx.rotate(bird.rotation*Math.PI/180);
+            
+            // Shadow burung (efek 3D)
+            ctx.fillStyle='rgba(0,0,0,0.15)';
+            ctx.beginPath();ctx.ellipse(3,3,20,15,0,0,Math.PI*2);ctx.fill();
+            
+            // Kaki dengan kuku
+            ctx.strokeStyle='#FF8F00';ctx.lineWidth=2;
+            const legSwing=Math.sin(bird.animationFrame*0.15)*1.5;
+            // Kaki kiri
+            ctx.beginPath();ctx.moveTo(-5,10);ctx.lineTo(-7,16);ctx.stroke();
+            ctx.fillStyle='#E65100';
+            ctx.beginPath();ctx.moveTo(-7,16);ctx.lineTo(-10,19+legSwing);ctx.lineTo(-8,19+legSwing);ctx.closePath();ctx.fill();
+            ctx.beginPath();ctx.moveTo(-7,16);ctx.lineTo(-7,20+legSwing);ctx.lineTo(-5,19+legSwing);ctx.closePath();ctx.fill();
+            ctx.beginPath();ctx.moveTo(-7,16);ctx.lineTo(-4,19+legSwing);ctx.lineTo(-6,19+legSwing);ctx.closePath();ctx.fill();
+            // Kaki kanan
+            ctx.beginPath();ctx.moveTo(2,10);ctx.lineTo(0,16);ctx.stroke();
+            ctx.fillStyle='#E65100';
+            ctx.beginPath();ctx.moveTo(0,16);ctx.lineTo(-3,19+legSwing);ctx.lineTo(-1,19+legSwing);ctx.closePath();ctx.fill();
+            ctx.beginPath();ctx.moveTo(0,16);ctx.lineTo(0,20+legSwing);ctx.lineTo(2,19+legSwing);ctx.closePath();ctx.fill();
+            ctx.beginPath();ctx.moveTo(0,16);ctx.lineTo(3,19+legSwing);ctx.lineTo(1,19+legSwing);ctx.closePath();ctx.fill();
+            
+            // Body dengan gradasi 3D
+            const bodyGrad=ctx.createRadialGradient(-8,-8,3,0,0,25);
+            bodyGrad.addColorStop(0,'#FFFFFF');
+            bodyGrad.addColorStop(0.2,'#FFF9C4');
+            bodyGrad.addColorStop(0.4,'#FFE082');
+            bodyGrad.addColorStop(0.6,'#FFC107');
+            bodyGrad.addColorStop(0.8,'#FF8F00');
+            bodyGrad.addColorStop(1,'#BF360C');
+            ctx.fillStyle=bodyGrad;
+            ctx.beginPath();ctx.ellipse(0,0,20,15,0,0,Math.PI*2);ctx.fill();
+            
+            // Belly dengan gradasi
+            const bellyGrad=ctx.createLinearGradient(0,0,0,12);
+            bellyGrad.addColorStop(0,'#FFFFFF');
+            bellyGrad.addColorStop(0.5,'#FFFDE7');
+            bellyGrad.addColorStop(1,'#FFE082');
+            ctx.fillStyle=bellyGrad;
+            ctx.beginPath();ctx.ellipse(-2,5,13,9,0,0,Math.PI*2);ctx.fill();
+            
+            // Wing dengan gradasi 3D
+            ctx.save();
+            ctx.translate(-8,-2);
+            ctx.rotate(bird.wingAngle*Math.PI/180);
+            const wingGrad=ctx.createLinearGradient(0,-8,-18,0);
+            wingGrad.addColorStop(0,'#FFFFFF');
+            wingGrad.addColorStop(0.3,'#FFE082');
+            wingGrad.addColorStop(0.6,'#FFC107');
+            wingGrad.addColorStop(1,'#E65100');
+            ctx.fillStyle=wingGrad;
+            ctx.beginPath();ctx.ellipse(-8,0,18,9,-0.3,0,Math.PI*2);ctx.fill();
+            // Feather details
+            ctx.strokeStyle='#BF360C';ctx.lineWidth=1;
+            for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(-5+i*3,-4);ctx.lineTo(-15+i*2,i*2);ctx.stroke();}
+            ctx.restore();
+            
+            // Tail dengan gradasi
+            const tailGrad=ctx.createLinearGradient(-18,0,-28,0);
+            tailGrad.addColorStop(0,'#FFC107');tailGrad.addColorStop(0.5,'#FF8F00');tailGrad.addColorStop(1,'#BF360C');
+            ctx.fillStyle=tailGrad;
+            ctx.beginPath();ctx.moveTo(-18,-2);ctx.lineTo(-28,-5);ctx.lineTo(-26,0);ctx.lineTo(-28,5);ctx.lineTo(-18,2);ctx.closePath();ctx.fill();
+            
+            // Eye dengan efek 3D
+            const eyeGrad=ctx.createRadialGradient(10,-7,1,12,-5,7);
+            eyeGrad.addColorStop(0,'#FFFFFF');eyeGrad.addColorStop(0.7,'#F5F5F5');eyeGrad.addColorStop(1,'#E0E0E0');
+            ctx.fillStyle=eyeGrad;
+            ctx.beginPath();ctx.arc(12,-5,7,0,Math.PI*2);ctx.fill();
+            // Pupil
+            ctx.fillStyle='#1A1A1A';
+            ctx.beginPath();ctx.arc(14,-5,3.5,0,Math.PI*2);ctx.fill();
+            // Eye shine
+            ctx.fillStyle='#FFFFFF';
+            ctx.beginPath();ctx.arc(15,-7,1.5,0,Math.PI*2);ctx.fill();
+            
+            // Beak dengan gradasi 3D
+            const beakGrad=ctx.createLinearGradient(20,-4,34,4);
+            beakGrad.addColorStop(0,'#FFB74D');
+            beakGrad.addColorStop(0.5,'#FF9800');
+            beakGrad.addColorStop(1,'#E65100');
+            ctx.fillStyle=beakGrad;
+            ctx.beginPath();ctx.moveTo(20,-4);ctx.quadraticCurveTo(30,-2,34,0);ctx.quadraticCurveTo(30,2,20,2);ctx.closePath();ctx.fill();
+            // Lower beak
+            ctx.fillStyle='#CC5500';
+            ctx.beginPath();ctx.moveTo(20,2);ctx.quadraticCurveTo(28,4,30,3);ctx.lineTo(20,5);ctx.closePath();ctx.fill();
+            
+            // Crest dengan gradasi
+            const crestGrad=ctx.createLinearGradient(-5,-12,-15,-20);
+            crestGrad.addColorStop(0,'#FFC107');crestGrad.addColorStop(0.5,'#FF8F00');crestGrad.addColorStop(1,'#E65100');
+            ctx.fillStyle=crestGrad;
+            ctx.beginPath();ctx.moveTo(-5,-12);ctx.quadraticCurveTo(-8,-22,-15,-20);ctx.quadraticCurveTo(-10,-16,-8,-10);ctx.closePath();ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        function drawPipe(pipe){
+            // Shadow pipa (efek 3D)
+            ctx.fillStyle='rgba(0,0,0,0.3)';
+            ctx.fillRect(pipe.x+5,5,pipeWidth,pipe.topHeight);
+            ctx.fillRect(pipe.x+5,pipe.bottomY+5,pipeWidth,canvas.height-pipe.bottomY);
+            
+            // Pipa atas dengan gradasi 3D
+            const topGrad=ctx.createLinearGradient(pipe.x,0,pipe.x+pipeWidth,0);
+            topGrad.addColorStop(0,'#1B5E20');
+            topGrad.addColorStop(0.15,'#66BB6A');
+            topGrad.addColorStop(0.3,'#81C784');
+            topGrad.addColorStop(0.5,'#4CAF50');
+            topGrad.addColorStop(0.85,'#388E3C');
+            topGrad.addColorStop(1,'#1B5E20');
+            ctx.fillStyle=topGrad;
+            ctx.fillRect(pipe.x,0,pipeWidth,pipe.topHeight);
+            
+            // Outline
+            ctx.strokeStyle='#0D3B0F';ctx.lineWidth=3;
+            ctx.strokeRect(pipe.x,0,pipeWidth,pipe.topHeight);
+            
+            // Highlight (efek 3D)
+            ctx.fillStyle='rgba(255,255,255,0.4)';
+            ctx.fillRect(pipe.x+8,0,6,pipe.topHeight-30);
+            ctx.fillStyle='rgba(255,255,255,0.2)';
+            ctx.fillRect(pipe.x+16,0,4,pipe.topHeight-30);
+            
+            // Cap atas dengan gradasi 3D
+            const capGrad=ctx.createLinearGradient(pipe.x-6,pipe.topHeight-30,pipe.x+pipeWidth+6,pipe.topHeight-30);
+            capGrad.addColorStop(0,'#1B5E20');
+            capGrad.addColorStop(0.15,'#4CAF50');
+            capGrad.addColorStop(0.3,'#81C784');
+            capGrad.addColorStop(0.5,'#4CAF50');
+            capGrad.addColorStop(0.85,'#388E3C');
+            capGrad.addColorStop(1,'#1B5E20');
+            ctx.fillStyle=capGrad;
+            ctx.fillRect(pipe.x-6,pipe.topHeight-28,pipeWidth+12,28);
+            ctx.strokeStyle='#0D3B0F';ctx.lineWidth=3;
+            ctx.strokeRect(pipe.x-6,pipe.topHeight-28,pipeWidth+12,28);
+            // Cap highlight
+            ctx.fillStyle='rgba(255,255,255,0.3)';
+            ctx.fillRect(pipe.x-2,pipe.topHeight-26,6,24);
+            
+            // Pipa bawah dengan gradasi 3D
+            const bottomGrad=ctx.createLinearGradient(pipe.x,pipe.bottomY,pipe.x+pipeWidth,pipe.bottomY);
+            bottomGrad.addColorStop(0,'#1B5E20');
+            bottomGrad.addColorStop(0.15,'#66BB6A');
+            bottomGrad.addColorStop(0.3,'#81C784');
+            bottomGrad.addColorStop(0.5,'#4CAF50');
+            bottomGrad.addColorStop(0.85,'#388E3C');
+            bottomGrad.addColorStop(1,'#1B5E20');
+            ctx.fillStyle=bottomGrad;
+            ctx.fillRect(pipe.x,pipe.bottomY,pipeWidth,canvas.height-pipe.bottomY);
+            
+            // Outline
+            ctx.strokeStyle='#0D3B0F';ctx.lineWidth=3;
+            ctx.strokeRect(pipe.x,pipe.bottomY,pipeWidth,canvas.height-pipe.bottomY);
+            
+            // Highlight
+            ctx.fillStyle='rgba(255,255,255,0.4)';
+            ctx.fillRect(pipe.x+8,pipe.bottomY+30,6,canvas.height-pipe.bottomY-30);
+            ctx.fillStyle='rgba(255,255,255,0.2)';
+            ctx.fillRect(pipe.x+16,pipe.bottomY+30,4,canvas.height-pipe.bottomY-30);
+            
+            // Cap bawah dengan gradasi 3D
+            ctx.fillStyle=capGrad;
+            ctx.fillRect(pipe.x-6,pipe.bottomY,pipeWidth+12,28);
+            ctx.strokeStyle='#0D3B0F';ctx.lineWidth=3;
+            ctx.strokeRect(pipe.x-6,pipe.bottomY,pipeWidth+12,28);
+            // Cap highlight
+            ctx.fillStyle='rgba(255,255,255,0.3)';
+            ctx.fillRect(pipe.x-2,pipe.bottomY+2,6,24);
+        }
+        
+        function spawnPipe(){const minTop=60,maxTop=canvas.height-pipeGap-minTop-50;const topHeight=Math.random()*(maxTop-minTop)+minTop;pipes.push({x:canvas.width,topHeight,bottomY:topHeight+pipeGap,passed:false});}
+        
+        function checkCollision(bird,pipe){
+            const birdRadius=12;
+            if(bird.x+birdRadius>pipe.x&&bird.x-birdRadius<pipe.x+pipeWidth){
+                if(bird.y-birdRadius<pipe.topHeight)return true;
+                if(bird.y+birdRadius>pipe.bottomY)return true;
+            }
+            return false;
+        }
+        
+        function gameOver(){
+            gameRunning=false;gameStarted=false;
+            if(animationId)cancelAnimationFrame(animationId);
+            playGameOverSound();
+            gameOverScreen.style.display='flex';
+            finalScoreElement.textContent=score;
+            if(score>highScore){highScore=score;try{localStorage.setItem('flappyHighScore',highScore)}catch(e){}highScoreElement.textContent=`🏆 Terbaik: ${highScore}`;newHighScoreElement.style.display='block';}
+            bestScoreElement.textContent=highScore;
+            medalElement.textContent=score>=30?'🥇':score>=20?'🥈':score>=10?'🥉':'💪';
+        }
+        
+        function handleJump(e){if(e)e.preventDefault();if(gameRunning){bird.velocity=bird.jump;bird.animationFrame=0;playJumpSound();}}
+        
+        startButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();initAudio();startGame();});
+        restartButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();initAudio();restartGame();});
+        startScreen.addEventListener('click',e=>{if(e.target===startScreen||e.target.classList.contains('title')||e.target.classList.contains('bird-preview')||e.target.classList.contains('instructions')||e.target.tagName==='P'||e.target.tagName==='SPAN'){e.preventDefault();initAudio();startGame();}});
+        document.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(!gameStarted&&!gameRunning){initAudio();if(gameOverScreen.style.display==='flex')restartGame();else startGame();}else handleJump(e);}});
+        document.addEventListener('click',e=>{if(gameStarted&&gameRunning)handleJump(e);});
+        document.addEventListener('touchstart',e=>{if(gameStarted&&gameRunning)handleJump(e);},{passive:false});
+        document.addEventListener('contextmenu',e=>e.preventDefault());
+    </script>
+</body>
+</html>
